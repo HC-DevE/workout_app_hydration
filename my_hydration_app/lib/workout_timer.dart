@@ -16,8 +16,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class WorkoutTimer extends StatefulWidget {
   const WorkoutTimer({Key? key}) : super(key: key);
@@ -27,123 +25,77 @@ class WorkoutTimer extends StatefulWidget {
 }
 
 class _WorkoutTimerState extends State<WorkoutTimer> {
-  static const int _workoutDuration = 30;
-
-  Timer? _timer;
-  int _remainingSeconds = _workoutDuration;
-
-  Future<void> _saveWorkoutCompletion() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('workoutCompleted', true);
-  }
-
-  Future<bool> _getWorkoutCompletion() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('workoutCompleted') ?? false;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _startTimer();
-  }
-
-  @override
-  void dispose() {
-    _stopTimer();
-    super.dispose();
-  }
+  bool _isRunning = false;
+  int _remainingTime = 0;
+  late Timer _timer;
 
   void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _isRunning = true;
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
-        _remainingSeconds -= 1;
-
-        if (_remainingSeconds == 0) {
+        _remainingTime--;
+        if (_remainingTime <= 0) {
           _stopTimer();
-          _saveWorkoutCompletion();
         }
       });
     });
   }
 
   void _stopTimer() {
-    _timer?.cancel();
-    _timer = null;
+    _isRunning = false;
+    _timer.cancel();
   }
 
-  Future<void> _showExitConfirmationDialog() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Are you sure?'),
-          content: const Text('Exiting the workout will mark it as incomplete.'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Exit'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed == true) {
-      _stopTimer();
-      Navigator.of(context).pop();
-    }
+  void _setTimer(int minutes) {
+    setState(() {
+      _remainingTime = minutes * 60;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        if (_timer == null) {
-          return true;
-        } else {
-          await _showExitConfirmationDialog();
-          return false;
-        }
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Workout Timer'),
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          '${_remainingTime ~/ 60}:${_remainingTime % 60}',
+          style: TextStyle(fontSize: 48),
         ),
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              child: Center(
-                child: Text(
-                  '$_remainingSeconds',
-                  style: Theme.of(context).textTheme.displayLarge,
-                ),
-              ),
-            ),
             ElevatedButton(
-              onPressed: () async {
-                if (_timer != null) {
-                  _showExitConfirmationDialog();
-                } else {
-                  final workoutCompleted = await _getWorkoutCompletion();
-                  if (!workoutCompleted) {
-                    _startTimer();
-                  }
-                }
-              },
-              child: Text(
-                _timer == null ? 'Start' : 'Exit',
-                style: const TextStyle(fontSize: 24),
-              ),
+              onPressed: _isRunning ? null : () => _setTimer(5),
+              child: Text('5 min'),
+            ),
+            SizedBox(width: 16),
+            ElevatedButton(
+              onPressed: _isRunning ? null : () => _setTimer(10),
+              child: Text('10 min'),
+            ),
+            SizedBox(width: 16),
+            ElevatedButton(
+              onPressed: _isRunning ? null : () => _setTimer(15),
+              child: Text('15 min'),
             ),
           ],
         ),
-      ),
+        SizedBox(height: 16),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: _isRunning ? _stopTimer : null,
+              child: Text('Stop'),
+            ),
+            SizedBox(width: 16),
+            ElevatedButton(
+              onPressed: _isRunning ? null : _startTimer,
+              child: Text('Start'),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
